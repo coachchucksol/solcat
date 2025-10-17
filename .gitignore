@@ -1,0 +1,6 @@
+/ledger
+.DS_Store
+/test-ledger
+
+/target/*
+!/target/deploy/
