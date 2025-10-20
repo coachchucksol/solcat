@@ -23,6 +23,14 @@ pub struct EmptyVaultIxData {
     pub discriminator: u8,
 }
 
+impl Default for EmptyVaultIxData {
+    fn default() -> Self {
+        Self {
+            discriminator: Self::DISCRIMINATOR,
+        }
+    }
+}
+
 impl EmptyVaultIxData {
     pub fn new() -> Self {
         Self {
@@ -30,8 +38,10 @@ impl EmptyVaultIxData {
         }
     }
 
+    /// # Safety
+    /// C style cast into bytes
     pub unsafe fn to_bytes(&self) -> &[u8] {
-        unsafe { crate::utils::to_bytes::<Self>(&self) }
+        unsafe { crate::utils::to_bytes::<Self>(self) }
     }
 }
 
@@ -50,6 +60,7 @@ pub fn process_empty_vault(
 ) -> ProgramResult {
     let [vault, admin, mint, admin_token, vault_token, token_program, system_program] = accounts
     else {
+        log!("Not enough keys, need 7, got {}", accounts.len());
         return Err(ProgramError::NotEnoughAccountKeys);
     };
     let _ = unsafe { load_ix_data::<EmptyVaultIxData>(data)? };
@@ -107,7 +118,14 @@ pub fn process_empty_vault(
     };
 
     // Vault Checks
-    Vault::check(program_id, vault, true, Some(admin), Some(mint))?;
+    Vault::check(
+        program_id,
+        vault,
+        true,
+        Some(admin),
+        Some(mint),
+        Some(vault_token),
+    )?;
     unsafe {
         Vault::check_unlock_okay(vault)?;
     }
@@ -142,7 +160,7 @@ pub fn process_empty_vault(
         authority: vault,
         amount: tokens_to_empty,
     }
-    .invoke_signed(&[signer.clone()])?;
+    .invoke_signed(std::slice::from_ref(&signer))?;
 
     // ----------------------- Close Vault Token Account -----------------------
 
@@ -151,7 +169,7 @@ pub fn process_empty_vault(
         destination: admin_token,
         authority: vault,
     }
-    .invoke_signed(&[signer.clone()])?;
+    .invoke_signed(std::slice::from_ref(&signer))?;
 
     // ----------------------- Close Vault -----------------------
     unsafe {

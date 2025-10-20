@@ -1,4 +1,6 @@
-use anyhow::Result;
+#![allow(dead_code)]
+
+use anyhow::{anyhow, Result};
 use solana_commitment_config::CommitmentLevel;
 use solana_keypair::Keypair;
 use solana_program::{clock::Clock, program_pack::Pack};
@@ -6,7 +8,7 @@ use solana_program_test::{BanksClientError, ProgramTest, ProgramTestContext};
 use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 use solana_system_transaction::{create_account, transfer};
-use solana_transaction::Transaction;
+use solana_transaction::{Instruction, Transaction};
 use solcat_diamond_hands_sdk::{accounts::vault::Vault, id, utils::load_account};
 use spl_associated_token_account_interface::{
     address::get_associated_token_address, instruction::create_associated_token_account_idempotent,
@@ -87,16 +89,16 @@ impl TestBuilder {
         let mint_account = Mint::unpack(&mint_account_raw.data)?;
 
         let source_token_account = get_associated_token_address(&source.pubkey(), mint);
-        let destination_token_account = get_associated_token_address(&destination, mint);
+        let destination_token_account = get_associated_token_address(destination, mint);
 
         self.context
             .banks_client
             .process_transaction_with_preflight_and_commitment(
                 Transaction::new_signed_with_payer(
                     &[transfer_checked(
-                        &token_program_id,
+                        token_program_id,
                         &source_token_account,
-                        &mint,
+                        mint,
                         &destination_token_account,
                         &source.pubkey(),
                         &[],
@@ -105,7 +107,7 @@ impl TestBuilder {
                     )
                     .unwrap()],
                     Some(&self.context.payer.pubkey()),
-                    &[&source, &self.context.payer],
+                    &[source, &self.context.payer],
                     blockhash,
                 ),
                 CommitmentLevel::Processed,
@@ -203,7 +205,7 @@ impl TestBuilder {
 
         let create_tx = create_account(
             &self.context.payer,
-            &mint,
+            mint,
             blockhash,
             min_rent,
             Mint::LEN as u64,
@@ -296,5 +298,122 @@ impl TestBuilder {
     pub async fn get_current_slot(&mut self) -> Result<u64> {
         let clock: Clock = self.context.banks_client.get_sysvar().await?;
         Ok(clock.slot)
+    }
+
+    pub async fn send_transaction(
+        &mut self,
+        instructions: &[Instruction],
+        payer: Option<&Pubkey>,
+        signers: &[&dyn Signer],
+    ) -> Result<()> {
+        // Fetch latest blockhash
+        let recent_blockhash = self
+            .context
+            .banks_client
+            .get_latest_blockhash()
+            .await
+            .map_err(|e| anyhow!("failed to get blockhash: {}", e))?;
+
+        // Create transaction
+        let tx = Transaction::new_signed_with_payer(
+            instructions,
+            payer.or(Some(&self.context.payer.pubkey())),
+            signers,
+            recent_blockhash,
+        );
+
+        println!("\n{}", "=".repeat(60));
+        println!("SENDING TRANSACTION");
+        println!("{}", "=".repeat(60));
+
+        // Signature info
+        println!("\n[Signatures] ({} total)", tx.signatures.len());
+        for (i, sig) in tx.signatures.iter().enumerate() {
+            println!("  {}: {}", i, sig);
+        }
+
+        // Message info
+        let msg = &tx.message;
+        println!("\n[Message]");
+        println!(
+            "  Recent blockhash: {} (just fetched)",
+            msg.recent_blockhash
+        );
+        println!(
+            "  Num required signatures: {}",
+            msg.header.num_required_signatures
+        );
+        println!(
+            "  Num readonly signed accounts: {}",
+            msg.header.num_readonly_signed_accounts
+        );
+        println!(
+            "  Num readonly unsigned accounts: {}",
+            msg.header.num_readonly_unsigned_accounts
+        );
+
+        // Account keys
+        println!("\n[Account Keys] ({} total)", msg.account_keys.len());
+        for (i, key) in msg.account_keys.iter().enumerate() {
+            println!("  [{}]: {}", i, key);
+        }
+
+        // Instructions
+        println!("\n[Instructions] ({} total)", msg.instructions.len());
+        for (i, ix) in msg.instructions.iter().enumerate() {
+            println!("\n  Instruction #{}:", i);
+            println!(
+                "    Program: {} (account_keys[{}])",
+                msg.account_keys[ix.program_id_index as usize], ix.program_id_index
+            );
+            println!("    Account indices: {:?}", ix.accounts);
+            println!("    Data: {} bytes", ix.data.len());
+        }
+
+        println!("\n{}", "=".repeat(60));
+        println!("PROCESSING...");
+        println!("{}\n", "=".repeat(60));
+
+        // Use simulate instead to get logs
+        let simulation = self
+            .context
+            .banks_client
+            .simulate_transaction(tx.clone())
+            .await
+            .map_err(|e| anyhow!("failed to simulate transaction: {}", e))?;
+
+        // Print logs from simulation
+        println!("\n{}", "=".repeat(60));
+        println!("TRANSACTION LOGS");
+        println!("{}", "=".repeat(60));
+        if let Some(details) = simulation.simulation_details {
+            for log in &details.logs {
+                println!("{}", log);
+            }
+        } else {
+            println!("No simulation details available");
+        }
+        println!("{}\n", "=".repeat(60));
+
+        // Now actually process it
+        let result = self
+            .context
+            .banks_client
+            .process_transaction_with_preflight_and_commitment(tx, CommitmentLevel::Processed)
+            .await;
+
+        match result {
+            Ok(_) => {
+                println!("\n✅ SUCCESS: Transaction processed successfully\n");
+                Ok(())
+            }
+            Err(e) => {
+                eprintln!("\n❌ FAILED: Transaction failed");
+                eprintln!("{}", "=".repeat(60));
+                eprintln!("Error: {:#?}", e);
+                eprintln!("{}\n", "=".repeat(60));
+                Err(anyhow!("failed to send transaction: {}", e))
+            }
+        }
     }
 }

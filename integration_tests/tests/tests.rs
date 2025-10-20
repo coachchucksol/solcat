@@ -1,2 +1,2 @@
-mod example_program;
 mod fixtures;
+mod program;

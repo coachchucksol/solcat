@@ -333,11 +333,7 @@ impl<T: Copy> Copy for PodOption<T> {}
 impl<T: Copy> Clone for PodOption<T> {
     #[inline(always)]
     fn clone(&self) -> Self {
-        if self.is_some() {
-            Self::some(unsafe { *self.value.assume_init_ref() })
-        } else {
-            Self::none()
-        }
+        *self
     }
 }
 
@@ -363,17 +359,6 @@ impl<T: fmt::Debug> fmt::Debug for PodOption<T> {
     }
 }
 
-// ----------------- Optional compile-time guard -----------------
-// Enforce align=1 for specific instantiations you care about.
-// (Uncomment and adjust types as needed.)
-// use static_assertions::const_assert;
-// const_assert!(align_of::<u8>() == 1);
-// const_assert!(align_of::<PodU64>() == 1);
-// const_assert!(align_of::<Pubkey>() == 1);
-// const_assert!(align_of::<PodOption<u8>>() == 1);
-// const_assert!(align_of::<PodOption<PodU64>>() == 1);
-// const_assert!(align_of::<PodOption<Pubkey>>() == 1);
-
 #[cfg(test)]
 mod tests {
     use pinocchio::pubkey::Pubkey;
@@ -384,7 +369,7 @@ mod tests {
 
     // ---------- helpers ----------
     fn assert_copy_clone<T: Copy + Clone + PartialEq + Debug>(v: T) {
-        let c = v.clone();
+        let c = v;
         let cc = c;
         assert_eq!(v, c);
         assert_eq!(c, cc);
@@ -486,12 +471,12 @@ mod tests {
     fn podbool_roundtrip_and_valid() {
         let mut b = PodBool::from(false);
         assert!(b.is_valid());
-        assert_eq!(bool::from(b), false);
+        assert!(!bool::from(b));
         assert!(!b.get());
 
         b.set(true);
         assert!(b.is_valid());
-        assert_eq!(bool::from(b), true);
+        assert!(bool::from(b));
         assert!(b.get());
 
         let t = PodBool::TRUE;
@@ -502,7 +487,7 @@ mod tests {
 
         // Non-zero is true by From<PodBool> semantics
         let weird = PodBool { data: 255 };
-        assert_eq!(bool::from(weird), true);
+        assert!(bool::from(weird));
         // But validity check flags it
         assert!(!weird.is_valid());
     }

@@ -1,11 +1,11 @@
 use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
+use solana_account_decoder::UiAccountEncoding;
 use solana_client::{
     rpc_client::RpcClient,
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
     rpc_filter::{Memcmp, RpcFilterType},
 };
-use solana_account_decoder::UiAccountEncoding;
 use solana_keypair::{read_keypair_file, Keypair, Pubkey};
 use solana_signer::Signer;
 use solana_transaction::Transaction;
@@ -178,7 +178,8 @@ pub fn lock_vault(
     let ixs = lock_vault_ix(&keypair.pubkey(), mint, slots_to_lock, tokens_to_lock);
 
     let blockhash = rpc_client.get_latest_blockhash()?;
-    let tx = Transaction::new_signed_with_payer(&ixs, Some(&keypair.pubkey()), &[&keypair], blockhash);
+    let tx =
+        Transaction::new_signed_with_payer(&ixs, Some(&keypair.pubkey()), &[&keypair], blockhash);
 
     rpc_client.send_and_confirm_transaction_with_spinner(&tx)?;
 

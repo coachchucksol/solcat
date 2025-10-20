@@ -41,9 +41,6 @@ pub struct Vault {
     start_slot: PodU64,
     /// The minimum amount of slots that vault has to be locked for
     slots_locked: PodU64,
-    /// The total amount of tokens that vault has locked - techincally, we don't need to track this as it is always equal to the amount of tokens
-    /// in the vault token account. But for an extra u64 worth of space, all of the info we need is in one place ( plus all rent is refunded after the vault is emptied )
-    tokens_locked: PodU64,
     /// General good practice to have some reserved bytes for new features - but not necessary for the current implementation
     reserved: [u8; 32],
 }
@@ -74,7 +71,7 @@ impl Discriminator for Vault {
 macro_rules! vault_seed_with_bump {
     ($admin:expr, $mint:expr, $bump_slice:expr) => {
         [
-            crate::accounts::vault::Vault::SEED,
+            $crate::accounts::vault::Vault::SEED,
             $admin.as_ref(),
             $mint.as_ref(),
             $bump_slice,
@@ -145,6 +142,7 @@ impl Vault {
         expect_writable: bool,
         check_admin: Option<&AccountInfo>,
         check_mint: Option<&AccountInfo>,
+        check_token: Option<&AccountInfo>,
     ) -> Result<(), ProgramError> {
         let account_owner = account_info.owner();
         if account_owner.ne(program_id) {
@@ -209,15 +207,28 @@ impl Vault {
             }
         }
 
+        if let Some(token) = check_token {
+            if account.vault_token().ne(token.key()) {
+                log!(
+                    "Vault token account does not match {} != {}",
+                    account.vault_token(),
+                    token.key()
+                );
+                return Err(ProgramError::InvalidAccountData);
+            }
+        }
+
         Ok(())
     }
 
     /// This is a general function to check if a vault can be unlocked.
     /// Note that we ALWAYS use checked arithmatic, in this case `saturating_sub`
     /// byte overflows and underflows are deadly and quiet.
+    /// # Safety
+    /// Needs to load the account, which is "unsafe"
     pub unsafe fn check_unlock_okay(account_info: &AccountInfo) -> Result<(), ProgramError> {
-        let mut data = account_info.borrow_mut_data_unchecked();
-        let account = load_account_mut_unchecked::<Vault>(&mut data)?;
+        let data = account_info.borrow_mut_data_unchecked();
+        let account = load_account_mut_unchecked::<Vault>(data)?;
         let clock = Clock::get()?;
 
         let slots_elapsed = clock.slot.saturating_sub(account.start_slot());
@@ -236,16 +247,18 @@ impl Vault {
 
     // ----------------------- INITIALIZE ------------------------
     /// Just initalizes the Vault account, nothing special here
+    /// # Safety
+    /// Needs to load the account, which is "unsafe"
     pub unsafe fn initialize(
         account_info: &AccountInfo,
         admin: &Pubkey,
         mint: &Pubkey,
         ix_data: &LockVaultIxData,
+        vault_token: &Pubkey,
         mint_decimals: u8,
-        tokens_locked: u64,
     ) -> Result<(), ProgramError> {
-        let mut data = account_info.borrow_mut_data_unchecked();
-        let account = load_account_mut_unchecked::<Vault>(&mut data)?;
+        let data = account_info.borrow_mut_data_unchecked();
+        let account = load_account_mut_unchecked::<Vault>(data)?;
 
         if account.is_initialized() {
             log!("Vault account is already initialized");
@@ -258,10 +271,10 @@ impl Vault {
         account.bump = ix_data.vault_bump;
         account.admin = *admin;
         account.mint = *mint;
+        account.vault_token = *vault_token;
         account.mint_decimals = mint_decimals;
         account.start_slot = PodU64::from(clock.slot);
         account.slots_locked = PodU64::from(ix_data.slots_to_lock);
-        account.tokens_locked = PodU64::from(tokens_locked);
 
         Ok(())
     }
@@ -284,16 +297,16 @@ impl Vault {
         &self.mint
     }
 
+    pub fn vault_token(&self) -> &Pubkey {
+        &self.vault_token
+    }
+
     pub fn start_slot(&self) -> u64 {
         self.start_slot.into()
     }
 
     pub fn slots_locked(&self) -> u64 {
         self.slots_locked.into()
-    }
-
-    pub fn tokens_locked(&self) -> u64 {
-        self.tokens_locked.into()
     }
 }
 
@@ -313,8 +326,7 @@ impl fmt::Display for Vault {
              ├─ Mint: {:?}\n\
              ├─ Vault Token Account: {:?}\n\
              ├─ Start Slot: {}\n\
-             ├─ Slots Locked: {} ({:.3} epochs)\n\
-             └─ Tokens Locked: {}",
+             └─ Slots Locked: {} ({:.3} epochs)",
             discriminator_str,
             self.bump,
             self.admin,
@@ -323,7 +335,6 @@ impl fmt::Display for Vault {
             self.start_slot(),
             self.slots_locked(),
             self.slots_locked() as f64 / 432_000.0,
-            self.tokens_locked() / (10u64.pow(self.mint_decimals as u32)),
         )
     }
 }

@@ -60,7 +60,7 @@ pub fn lock_vault_ix(
 
     let (vault, vault_bump) = vault_address(admin, mint);
 
-    let admin_token = get_associated_token_address(&admin, mint);
+    let admin_token = get_associated_token_address(admin, mint);
     let vault_token = get_associated_token_address(&vault, mint);
 
     // [vault, admin, mint, admin_token, vault_token, token_program, system_program]

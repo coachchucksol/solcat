@@ -13,7 +13,7 @@ import { Buffer } from 'buffer';
 // ----------------------- PROGRAM ID -----------------------
 export const PROGRAM_ID = new PublicKey('CATvuZTNuyeBkoo5Tpeqtxcn51NDLNMExWPZ5vzQxkEg');
 // export const SOLCAT_MINT = new PublicKey('84Y6h6XoaLAD1zxoQ2CDhcZYRpNsSBKsXULCnpjXpump');
-export const SOLCAT_MINT = new PublicKey('Fvg3HU47cXfmnys3tKSn6ZFnMgL7Rti61ZdcJcPX89h5');
+export const SOLCAT_MINT = new PublicKey('2BQVBGuGMbb9zwru9eFYhM5tuYQuPmbt4PVM15hBw9ej');
 
 export function id(): PublicKey {
   return PROGRAM_ID;
@@ -158,13 +158,17 @@ interface LockVaultIxData {
 }
 
 function serializeLockVaultIxData(data: LockVaultIxData): Buffer {
-  // Rust's Option<u64> with #[repr(C)] has specific layout:
-  // - discriminant (u8): 1 byte
-  // - padding: 7 bytes (to align u64)
-  // - value (u64): 8 bytes
-  // Total Option<u64> = 16 bytes
+  // Struct layout with #[repr(C)]:
+  // discriminator: u8 (offset 0)
+  // vault_bump: u8 (offset 1)
+  // padding: 6 bytes (offset 2-7, to align u64)
+  // slots_to_lock: u64 (offset 8-15)
+  // tokens_to_lock: Option<u64> (offset 16-31)
+  //   - discriminant: u8 (offset 16)
+  //   - padding: 7 bytes (offset 17-23)
+  //   - value: u64 (offset 24-31)
 
-  const buffer = Buffer.alloc(1 + 1 + 8 + 16); // discriminator + bump + slots + Option<u64>
+  const buffer = Buffer.alloc(32);
   let offset = 0;
 
   // Write discriminator
@@ -174,6 +178,9 @@ function serializeLockVaultIxData(data: LockVaultIxData): Buffer {
   // Write vault_bump
   buffer.writeUInt8(data.vaultBump, offset);
   offset += 1;
+
+  // Padding to align slots_to_lock at offset 8
+  offset += 6;
 
   // Write slots_to_lock
   buffer.writeBigUInt64LE(data.slotsToLock, offset);

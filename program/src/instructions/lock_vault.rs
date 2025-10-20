@@ -39,8 +39,10 @@ impl LockVaultIxData {
         }
     }
 
+    /// # Safety
+    /// C style cast into bytes
     pub unsafe fn to_bytes(&self) -> &[u8] {
-        unsafe { crate::utils::to_bytes::<Self>(&self) }
+        unsafe { crate::utils::to_bytes::<Self>(self) }
     }
 }
 
@@ -59,9 +61,9 @@ pub fn process_lock_vault(
 ) -> ProgramResult {
     let [vault, admin, mint, admin_token, vault_token, token_program, system_program] = accounts
     else {
+        log!("Not enough keys, need 7, got {}", accounts.len());
         return Err(ProgramError::NotEnoughAccountKeys);
     };
-
     let ix_data = unsafe { load_ix_data::<LockVaultIxData>(data)? };
 
     // ----------------------- CHECKS -----------------------
@@ -99,6 +101,7 @@ pub fn process_lock_vault(
             );
             return Err(ProgramError::InvalidAccountData);
         }
+
         if vault_token_account.mint().ne(mint.key()) {
             log!(
                 "Mint does not match the vault token account {} != {}",
@@ -119,6 +122,7 @@ pub fn process_lock_vault(
             );
             return Err(ProgramError::InvalidAccountData);
         }
+
         if admin_token_account.mint().ne(mint.key()) {
             log!(
                 "Mint does not match the admin token account {} != {}",
@@ -131,7 +135,7 @@ pub fn process_lock_vault(
         admin_token_account.amount()
     };
 
-    let tokens_to_lock = ix_data.tokens_to_lock.unwrap_or_else(|| all_tokens);
+    let tokens_to_lock = ix_data.tokens_to_lock.unwrap_or(all_tokens);
 
     if tokens_to_lock > all_tokens {
         log!(
@@ -143,7 +147,6 @@ pub fn process_lock_vault(
     }
 
     // ----------------------- Create Vault -----------------------
-
     let rent = Rent::get()?;
 
     let bump_bytes = [ix_data.vault_bump];
@@ -154,7 +157,6 @@ pub fn process_lock_vault(
         Seed::from(seed_with_bump[2]),
         Seed::from(seed_with_bump[3]),
     ];
-
     Vault::check_seeds(admin.key(), mint.key(), ix_data.vault_bump, &signing_seeds)?;
 
     let signer = Signer::from(&signing_seeds);
@@ -163,19 +165,19 @@ pub fn process_lock_vault(
         from: admin,
         to: vault,
         space: Vault::LEN as u64,
-        owner: &program_id,
+        owner: program_id,
         lamports: rent.minimum_balance(Vault::LEN),
     }
-    .invoke_signed(&[signer.clone()])?;
+    .invoke_signed(std::slice::from_ref(&signer))?;
 
     unsafe {
         Vault::initialize(
             vault,
             admin.key(),
             mint.key(),
-            &ix_data,
+            ix_data,
+            vault_token.key(),
             mint_decimals,
-            tokens_to_lock,
         )?;
     }
 

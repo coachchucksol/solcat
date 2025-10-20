@@ -1,7 +1,7 @@
 'use server';
 
 import { Connection, PublicKey } from '@solana/web3.js';
-import { getAccount, getAssociatedTokenAddressSync } from '@solana/spl-token';
+import { getAccount, getAssociatedTokenAddressSync, getMint } from '@solana/spl-token';
 import { deserializeVault, vaultAddress, vaultToJSON, VaultJSON } from '../controllers/solcat';
 
 // This runs on the server, so the RPC endpoint stays private
@@ -30,14 +30,14 @@ export async function getBalance(address: string) {
   }
 }
 
-export async function getTokenBalance(owner: string, mint: string) {
+export async function getTokenBalance(owner: string, mint: string, allowOffcurve = false) {
   try {
     const connection = getConnection();
     const ownerPubkey = new PublicKey(owner);
     const mintPubkey = new PublicKey(mint);
 
     // Get the associated token account address
-    const tokenAccount = getAssociatedTokenAddressSync(mintPubkey, ownerPubkey);
+    const tokenAccount = getAssociatedTokenAddressSync(mintPubkey, ownerPubkey, allowOffcurve);
 
     try {
       // Try to get the token account
@@ -62,6 +62,39 @@ export async function getTokenBalance(owner: string, mint: string) {
     }
   } catch (error) {
     console.error('Error getting token balance:', error);
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+export async function getMintInfo(mint: string) {
+  try {
+    const connection = getConnection();
+    const mintPubkey = new PublicKey(mint);
+
+    // Get the associated token account address
+    try {
+      // Try to get the token account
+      const mintInfo = await getMint(connection, mintPubkey);
+
+      return {
+        success: true as const,
+        data: {
+          decimals: mintInfo.decimals,
+          supply: mintInfo.supply
+        },
+      };
+    } catch (accountError) {
+      // Mint account doesn't exist
+      return {
+        success: false as const,
+        data: {},
+      };
+    }
+  } catch (error) {
+    console.error('Error getting mint:', error);
     return {
       success: false as const,
       error: error instanceof Error ? error.message : 'Unknown error',
