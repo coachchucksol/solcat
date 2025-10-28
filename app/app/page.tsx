@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import Image from "next/image";
 import dynamic from 'next/dynamic';
-import { getBalance, getVault, getTokenBalance, submitTransaction, getRecentBlockhash, getMintInfo } from './actions/solana';
+import { getBalance, getVault, getTokenBalance, submitTransaction, getRecentBlockhash, getMintInfo, getEpochInfo } from './actions/solana';
 import { VaultJSON, SOLCAT_MINT, lockVaultIx, emptyVaultIx, vaultAddress } from './controllers/solcat';
 import { Transaction } from '@solana/web3.js';
 
@@ -23,12 +23,19 @@ interface MintInfo {
   supply: bigint;
 }
 
+interface EpochInfo {
+  slot: number;
+  epoch: number;
+  slotIndex: number;
+}
+
 export default function Home() {
   // ============================================================================
   // State
   // ============================================================================
   const { publicKey, signTransaction } = useWallet();
   const [balance, setBalance] = useState<number | null>(null);
+  const [epochInfo, setEpochInfo] = useState<EpochInfo | null>(null);
   const [solcatBalance, setSolcatBalance] = useState<string | null>(null);
   const [solcatVaultBalance, setSolcatVaultBalance] = useState<string | null>(null);
   const [vault, setVault] = useState<VaultData | null>(null);
@@ -50,6 +57,7 @@ export default function Home() {
       loadSolcatBalance();
       loadSolcatVaultBalance();
       loadMint();
+      loadEpochInfo();
     } else {
       setBalance(null);
       setVault(null);
@@ -72,6 +80,19 @@ export default function Home() {
 
     setLoadingMint(true);
   };
+
+  const loadEpochInfo = async () => {
+    if (!publicKey) return;
+
+    const result = await getEpochInfo();
+    if (result.success) {
+      setEpochInfo(result.data);
+    } else {
+      console.error('Failed to load EpochInfo:', result.error);
+      setBalance(null);
+    }
+  };
+
 
   const loadBalance = async () => {
     if (!publicKey) return;
@@ -190,6 +211,8 @@ export default function Home() {
       // Reload vault data
       await loadVault();
       await loadSolcatBalance();
+      await loadSolcatVaultBalance();
+      await loadEpochInfo();
     } catch (error) {
       console.error('Error creating vault:', error);
       alert(`Failed to create vault: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -239,6 +262,33 @@ export default function Home() {
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
   };
+
+  const getSlotsLeft = (startSlot: number, slotsLocked: number, currentSlot: number) => {
+    return Math.max(0, (startSlot + slotsLocked) - currentSlot);
+  }
+
+  const estimatedTimeLeft = (startSlot: number, slotsLocked: number, currentSlot: number) => {
+    const slotsLeft = getSlotsLeft(startSlot, slotsLocked, currentSlot);
+    const timePerSlotMS = 500;
+    const timeLeftMS = slotsLeft * timePerSlotMS;
+    const duration = {
+      milliseconds: timeLeftMS,
+      seconds: Math.floor(timeLeftMS / 1000),
+      minutes: Math.floor(timeLeftMS / (1000 * 60)),
+      hours: Math.floor(timeLeftMS / (1000 * 60 * 60)),
+    };
+    return duration;
+  }
+
+  const formatDuration = (duration: ReturnType<typeof estimatedTimeLeft>) => {
+    if (duration.hours > 0) {
+      return `${duration.hours}h ${duration.minutes % 60}m`;
+    } else if (duration.minutes > 0) {
+      return `${duration.minutes}m ${duration.seconds % 60}s`;
+    } else {
+      return `${duration.seconds}s`;
+    }
+  }
 
   // ============================================================================
   // Renders
@@ -371,7 +421,7 @@ export default function Home() {
                   <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-xl p-4 sm:p-5 border border-blue-500/20">
                     <p className="text-blue-400 text-xs font-semibold uppercase tracking-wider mb-2">Lock Duration</p>
                     <p className="text-2xl font-bold text-white">
-                      {(BigInt(vault.slotsLocked) / BigInt(432000)).toString()}
+                      {(BigInt(vault.slotsLocked)).toString()} Slots
                     </p>
                     <p className="text-blue-400/60 text-xs mt-1">epochs ({vault.slotsLocked} slots)</p>
                   </div>
@@ -380,8 +430,24 @@ export default function Home() {
                 {/* Additional Info */}
                 <div className="space-y-3">
                   <div className="bg-white/5 rounded-xl p-4 sm:p-5 border border-white/10">
-                    <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Start Slot</p>
-                    <p className="text-white font-mono text-sm">{vault.startSlot}</p>
+                    <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Estimated Lock Up</p>
+                      <p className="text-white font-mono text-sm">
+                        {formatDuration(estimatedTimeLeft(
+                          Number(vault.startSlot),
+                          Number(vault.slotsLocked),
+                          epochInfo?.slot ?? 0
+                        ))}
+                      </p>
+                  </div>
+
+                  <div className="bg-white/5 rounded-xl p-4 sm:p-5 border border-white/10">
+                    <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Current Slot</p>
+                      <p className="text-white font-mono text-sm">{ epochInfo?.slot ?? 'N/A' }</p>
+                  </div>
+
+                  <div className="bg-white/5 rounded-xl p-4 sm:p-5 border border-white/10">
+                    <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Start/End Slot</p>
+                      <p className="text-white font-mono text-sm">{vault.startSlot}-{vault.startSlot + vault.slotsLocked}</p>
                   </div>
 
                   <div className="bg-white/5 rounded-xl p-4 sm:p-5 border border-white/10">

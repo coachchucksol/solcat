@@ -90,7 +90,7 @@ pub fn lock_vault_ix(
     [vault_ata_ix, lock_vault_ix]
 }
 
-pub fn empty_vault_ix(admin: &Pubkey, mint: &Pubkey) -> Instruction {
+pub fn empty_vault_ix(admin: &Pubkey, mint: &Pubkey) -> [Instruction; 2] {
     let program_id = id();
     let token_program = spl_token_interface::id();
     let system_program = solana_system_interface::program::id();
@@ -114,9 +114,22 @@ pub fn empty_vault_ix(admin: &Pubkey, mint: &Pubkey) -> Instruction {
     let ix_data = instructions::empty_vault::EmptyVaultIxData::new();
     let ix_data_bytes = unsafe { ix_data.to_bytes() };
 
-    Instruction {
+    let empty_vault_ix = Instruction {
         program_id,
         accounts,
         data: ix_data_bytes.to_vec(),
-    }
+    };
+
+    // Note, we don't strictly need this call, however, its possible for a user to "clean"
+    // up old token accounts with no tokens in them, so this makes sure the admin has the
+    // correct token account before we transfer the tokens back. From a UX perspective,
+    // imagine you have a user that goes to unlock their vault and in the time they had their
+    // tokens locked up the closed their token account - then the TX would fail and they'd
+    // freak out and send me angry messages saying, I rugged them. So we put this in just in case!
+    // Note, `idempotent` means it will only try to create the account if it does not exsist, so its
+    // safe in both cases.
+    let admin_ata_ix =
+        create_associated_token_account_idempotent(admin, admin, mint, &token_program);
+
+    [admin_ata_ix, empty_vault_ix]
 }

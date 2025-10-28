@@ -57,9 +57,9 @@ mod vault_tests {
     pub async fn empty_vault(fixture: &mut TestBuilder, mint: &Pubkey) -> Result<()> {
         let admin = fixture.context.payer.insecure_clone();
 
-        let ix = empty_vault_ix(&admin.pubkey(), mint);
+        let ixs = empty_vault_ix(&admin.pubkey(), mint);
 
-        fixture.send_transaction(&[ix], None, &[&admin]).await?;
+        fixture.send_transaction(&ixs, None, &[&admin]).await?;
 
         Ok(())
     }

@@ -1,11 +1,10 @@
 use pinocchio::program_error::ProgramError;
 
+/// Nothing special here, just some more error types
 #[derive(Clone, PartialEq)]
 pub enum DiamondHandsError {
     InvalidInstruction,
     InvalidInstructionData,
-    ArithmeticOverflow,
-    ArithmeticUnderflow,
     VaultLocked,
 }
 

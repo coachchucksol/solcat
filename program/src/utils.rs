@@ -3,6 +3,9 @@ use pinocchio_log::log;
 
 use crate::errors::DiamondHandsError;
 
+// All on-chain accounts implement these: `Discriminator`, `DataLen`, and `Initialized`
+// while not strictly nesscary, it helps out with consistancy. In my current on-chain
+// products, I combine these traits into one.
 pub trait Discriminator {
     const DISCRIMINATOR: u8;
 }
@@ -17,6 +20,9 @@ pub trait Initialized {
 
 /// # Safety
 /// Caller must ensure everything is 1 byte aligned
+/// Note, this is why we have to use 1-byte aligned structs, it allows us to
+/// safely map a struct onto a section of memory - it is `safe` as long as the struct
+/// is 1-byte alinged.
 #[inline(always)]
 pub unsafe fn load_account<T: DataLen + Initialized>(bytes: &[u8]) -> Result<&T, ProgramError> {
     load_account_unchecked::<T>(bytes).and_then(|account| {
@@ -67,6 +73,7 @@ pub unsafe fn load_account_mut_unchecked<T: DataLen>(
 
 /// # Safety
 /// Caller must ensure everything is 1 byte aligned
+/// We follow the same standards for the IX data
 #[inline(always)]
 pub unsafe fn load_ix_data<T: DataLen>(bytes: &[u8]) -> Result<&T, ProgramError> {
     if bytes.len() != T::LEN {
@@ -88,6 +95,10 @@ pub unsafe fn to_bytes<T: DataLen>(data: &T) -> &[u8] {
 pub unsafe fn to_mut_bytes<T: DataLen>(data: &mut T) -> &mut [u8] {
     core::slice::from_raw_parts_mut(data as *mut T as *mut u8, T::LEN)
 }
+
+// --------------------- OTHER HELPERS ---------------------
+// The following helpers just make it look a little nicer to check certain aspects of accounts
+// or make sure the right program is asserted
 
 pub fn load_signer(info: &AccountInfo, expect_writable: bool) -> Result<(), ProgramError> {
     if !info.is_signer() {

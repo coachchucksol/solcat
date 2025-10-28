@@ -8,6 +8,7 @@ import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adap
 import '@solana/wallet-adapter-react-ui/styles.css';
 
 export const WalletContextProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  // Note `NEXT_PUBLIC_RPC_ENDPOINT` is not in the
   const endpoint = useMemo(() => process.env.NEXT_PUBLIC_RPC_ENDPOINT || 'https://api.devnet.solana.com', []);
 
   const wallets = useMemo(

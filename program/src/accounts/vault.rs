@@ -20,11 +20,15 @@ use crate::{
 };
 
 /// The Counter account structure
+/// Note: Note that all fields here are 1-byte aligned - thats by we use PodXX. This allows us to derefrence the
+/// account `C-style`, you could run into some trouble if you start using types that are not 1-byte aligned.
+/// Generally, if you can't 1-byte align every field, you need to redo your program.
 #[derive(Debug, Default, Copy, Clone)]
-#[repr(C)]
+#[repr(C, packed)]
 pub struct Vault {
     /// Used to identify the account as a Vault account - Not needed in this context as there is only one type of account
-    /// but it is a good standard practice
+    /// but it is a good standard practice. Also, I've recently been a fan of Options in on-chain structs as you don't have to
+    /// set a "unset" magic number to identify that it is unset.
     discriminator: PodOption<u8>,
     /// u8 "Bump" that is used to "bump" the vault PDA on curve. I can be derived on-chain, but that takes up CU. So we tend
     /// to derive it off-chain ( using find_program_address ) and then save it on-chain to rederive the PDA ( using create_program_address )
@@ -33,7 +37,7 @@ pub struct Vault {
     admin: Pubkey,
     /// The token mint of the token that is to be locked
     mint: Pubkey,
-    /// How many decimals the token has
+    /// How many decimals the token has - we could just load this from the mint, but it's nice to have around for frontend calculations at the cost of a byte
     mint_decimals: u8,
     /// Vault token account - This could be an associated token account, we're going to keep it simple and just use
     vault_token: Pubkey,
@@ -162,6 +166,7 @@ impl Vault {
         // Yes this is "unsafe" at its core, we are just mapping memory to a struct.
         // In C land, this is common, not so much in Rust. Take a look at the
         // `load_account` function in the `utils` folder for more details.
+        // note - this is a continuation of our 1-byte aligned discussion from above
         let account = unsafe {
             let data = account_info.borrow_data_unchecked();
             let result = load_account::<Vault>(data);
@@ -173,6 +178,8 @@ impl Vault {
             result?
         };
 
+        // We need to re-derive the PDA here to make sure it matches - else you could pass in a
+        // an account that does not match
         let account_key: Pubkey =
             Self::create_program_address(program_id, &account.admin, &account.mint, account.bump)?;
         if account_info.key().ne(&account_key) {
@@ -184,6 +191,8 @@ impl Vault {
             return Err(ProgramError::InvalidAccountData);
         }
 
+        // Optional admin check - this is like the `has_one` check in anchor
+        // It also checks if the admin is a signer
         if let Some(admin) = check_admin {
             load_signer(admin, true)?;
             if account.admin().ne(admin.key()) {
@@ -196,6 +205,7 @@ impl Vault {
             }
         }
 
+        // Optional mint check - this is like the `has_one` check in anchor
         if let Some(mint) = check_mint {
             if account.mint().ne(mint.key()) {
                 log!(
@@ -207,6 +217,7 @@ impl Vault {
             }
         }
 
+        // Optional token check - this is like the `has_one` check in anchor
         if let Some(token) = check_token {
             if account.vault_token().ne(token.key()) {
                 log!(
@@ -226,14 +237,18 @@ impl Vault {
     /// byte overflows and underflows are deadly and quiet.
     /// # Safety
     /// Needs to load the account, which is "unsafe"
-    pub unsafe fn check_unlock_okay(account_info: &AccountInfo) -> Result<(), ProgramError> {
-        let data = account_info.borrow_mut_data_unchecked();
-        let account = load_account_mut_unchecked::<Vault>(data)?;
+    pub fn check_unlock_okay(account_info: &AccountInfo) -> Result<(), ProgramError> {
+        let data = unsafe { account_info.borrow_mut_data_unchecked() };
+        let account = unsafe { load_account_mut_unchecked::<Vault>(data)? };
         let clock = Clock::get()?;
 
         let slots_elapsed = clock.slot.saturating_sub(account.start_slot());
         if slots_elapsed < account.slots_locked() {
             let remaining_slots = account.slots_locked().saturating_sub(slots_elapsed);
+
+            // Okay, one caveat to the checked arithmatic. Unsigned division is OK, is the denominator
+            // is a constant that can never be 0. This is because all `checked_div` checks for is
+            // a 0 in the denominator. However, in my programs, I still used checked_div for consistancy
             log!(
                 "Vault will unlock in {} slots ({} epochs)",
                 remaining_slots,
@@ -260,6 +275,7 @@ impl Vault {
         let data = account_info.borrow_mut_data_unchecked();
         let account = load_account_mut_unchecked::<Vault>(data)?;
 
+        // Fail initialization if already initalized - this stops re-init attacks
         if account.is_initialized() {
             log!("Vault account is already initialized");
             return Err(ProgramError::AccountAlreadyInitialized);
@@ -274,7 +290,7 @@ impl Vault {
         account.vault_token = *vault_token;
         account.mint_decimals = mint_decimals;
         account.start_slot = PodU64::from(clock.slot);
-        account.slots_locked = PodU64::from(ix_data.slots_to_lock);
+        account.slots_locked = ix_data.slots_to_lock;
 
         Ok(())
     }
@@ -301,6 +317,8 @@ impl Vault {
         &self.vault_token
     }
 
+    // Note that `self.start_slot` is a PodU64
+    // this getter will turn it into a u64 - which is nice
     pub fn start_slot(&self) -> u64 {
         self.start_slot.into()
     }
@@ -310,6 +328,8 @@ impl Vault {
     }
 }
 
+// I like to always have a good display for all of my on-chain
+// accounts - this helps the debugging process.
 impl fmt::Display for Vault {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let discriminator_str = match self.discriminator() {

@@ -2,6 +2,11 @@ use core::convert::TryFrom;
 use core::fmt;
 use core::mem::MaybeUninit;
 
+// PODS! Pods are just a wrapper around normal types that we use to
+// just make them byte arrays. This allows everything to be 1-byte alinged
+// which is nessecary for `casting` sections of memory to structs. Notice
+// all of our structs are 1-byte aligned for this reason.
+
 // ---------------- PODU16 ------------------------
 
 #[repr(C)]

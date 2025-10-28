@@ -11,9 +11,8 @@ import {
 import { Buffer } from 'buffer';
 
 // ----------------------- PROGRAM ID -----------------------
-export const PROGRAM_ID = new PublicKey('CATvuZTNuyeBkoo5Tpeqtxcn51NDLNMExWPZ5vzQxkEg');
-// export const SOLCAT_MINT = new PublicKey('84Y6h6XoaLAD1zxoQ2CDhcZYRpNsSBKsXULCnpjXpump');
-export const SOLCAT_MINT = new PublicKey('2BQVBGuGMbb9zwru9eFYhM5tuYQuPmbt4PVM15hBw9ej');
+export const PROGRAM_ID = new PublicKey(process.env.NEXT_PUBLIC_SOLCAT_DIAMOND_HANDS_ID || 'CATvuZTNuyeBkoo5Tpeqtxcn51NDLNMExWPZ5vzQxkEg');
+export const SOLCAT_MINT = new PublicKey(process.env.NEXT_PUBLIC_SOLCAT_MINT || '84Y6h6XoaLAD1zxoQ2CDhcZYRpNsSBKsXULCnpjXpump');
 
 export function id(): PublicKey {
   return PROGRAM_ID;
@@ -45,7 +44,6 @@ export interface Vault {
   vaultToken: PublicKey;
   startSlot: bigint;
   slotsLocked: bigint;
-  tokensLocked: bigint;
   reserved: Uint8Array;
 }
 
@@ -58,7 +56,6 @@ export interface VaultJSON {
   vaultToken: string;
   startSlot: string;
   slotsLocked: string;
-  tokensLocked: string;
   reserved: number[];
 }
 
@@ -72,7 +69,6 @@ export function vaultToJSON(vault: Vault): VaultJSON {
     vaultToken: vault.vaultToken.toString(),
     startSlot: vault.startSlot.toString(),
     slotsLocked: vault.slotsLocked.toString(),
-    tokensLocked: vault.tokensLocked.toString(),
     reserved: Array.from(vault.reserved),
   };
 }
@@ -87,12 +83,24 @@ export function vaultFromJSON(json: VaultJSON): Vault {
     vaultToken: new PublicKey(json.vaultToken),
     startSlot: BigInt(json.startSlot),
     slotsLocked: BigInt(json.slotsLocked),
-    tokensLocked: BigInt(json.tokensLocked),
     reserved: new Uint8Array(json.reserved),
   };
 }
 
 export function deserializeVault(data: Buffer): Vault {
+  // #[derive(Debug, Default, Copy, Clone)]
+  // #[repr(C, packed)]
+  // pub struct Vault {
+  //     discriminator: PodOption<u8>,
+  //     bump: u8,
+  //     admin: Pubkey,
+  //     mint: Pubkey,
+  //     mint_decimals: u8,
+  //     vault_token: Pubkey,
+  //     start_slot: PodU64,
+  //     slots_locked: PodU64,
+  //     reserved: [u8; 32],
+  // }
   let offset = 0;
 
   // Read discriminator (PodOption<u8>)
@@ -129,10 +137,6 @@ export function deserializeVault(data: Buffer): Vault {
   const slotsLocked = data.readBigUInt64LE(offset);
   offset += 8;
 
-  // Read tokens_locked (PodU64 - 8 bytes)
-  const tokensLocked = data.readBigUInt64LE(offset);
-  offset += 8;
-
   // Read reserved (32 bytes)
   const reserved = data.slice(offset, offset + 32);
 
@@ -145,7 +149,6 @@ export function deserializeVault(data: Buffer): Vault {
     vaultToken,
     startSlot,
     slotsLocked,
-    tokensLocked,
     reserved,
   };
 }
@@ -158,17 +161,16 @@ interface LockVaultIxData {
 }
 
 function serializeLockVaultIxData(data: LockVaultIxData): Buffer {
-  // Struct layout with #[repr(C)]:
-  // discriminator: u8 (offset 0)
-  // vault_bump: u8 (offset 1)
-  // padding: 6 bytes (offset 2-7, to align u64)
-  // slots_to_lock: u64 (offset 8-15)
-  // tokens_to_lock: Option<u64> (offset 16-31)
-  //   - discriminant: u8 (offset 16)
-  //   - padding: 7 bytes (offset 17-23)
-  //   - value: u64 (offset 24-31)
+  // #[repr(C, packed)]
+  // #[derive(Clone, Copy, Debug, PartialEq)]
+  // pub struct LockVaultIxData {
+  //     pub discriminator: u8,
+  //     pub vault_bump: u8,
+  //     pub slots_to_lock: PodU64,
+  //     pub tokens_to_lock: PodOption<PodU64>,
+  // }
 
-  const buffer = Buffer.alloc(32);
+  const buffer = Buffer.alloc(19);
   let offset = 0;
 
   // Write discriminator
@@ -179,9 +181,6 @@ function serializeLockVaultIxData(data: LockVaultIxData): Buffer {
   buffer.writeUInt8(data.vaultBump, offset);
   offset += 1;
 
-  // Padding to align slots_to_lock at offset 8
-  offset += 6;
-
   // Write slots_to_lock
   buffer.writeBigUInt64LE(data.slotsToLock, offset);
   offset += 8;
@@ -190,8 +189,6 @@ function serializeLockVaultIxData(data: LockVaultIxData): Buffer {
   if (data.tokensToLock !== null) {
     buffer.writeUInt8(1, offset); // Some discriminant
     offset += 1;
-    // 7 bytes padding
-    offset += 7;
     buffer.writeBigUInt64LE(data.tokensToLock, offset); // value
   } else {
     buffer.writeUInt8(0, offset); // None discriminant

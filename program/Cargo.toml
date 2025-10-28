@@ -6,8 +6,10 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib", "lib"]
 
+# Look at this almost-zero dependancy list!
 [dependencies]
 pinocchio = { workspace = true }
+# Note - this replaces the Solana `msg!`
 pinocchio-log = { workspace = true }
 pinocchio-pubkey = { workspace = true }
 pinocchio-system = { workspace = true }

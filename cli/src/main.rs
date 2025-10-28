@@ -187,11 +187,11 @@ pub fn lock_vault(
 }
 
 pub fn empty_vault(rpc_client: &RpcClient, keypair: &Keypair, mint: &Pubkey) -> Result<()> {
-    let ix = empty_vault_ix(&keypair.pubkey(), mint);
+    let ixs = empty_vault_ix(&keypair.pubkey(), mint);
 
     let blockhash = rpc_client.get_latest_blockhash()?;
     let tx =
-        Transaction::new_signed_with_payer(&[ix], Some(&keypair.pubkey()), &[&keypair], blockhash);
+        Transaction::new_signed_with_payer(&ixs, Some(&keypair.pubkey()), &[&keypair], blockhash);
 
     rpc_client.send_and_confirm_transaction_with_spinner(&tx)?;
 

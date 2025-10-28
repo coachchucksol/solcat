@@ -1,4 +1,6 @@
 #![allow(unexpected_cfgs)]
+
+// All in all, a pretty standard entrypoint
 pub mod accounts;
 pub mod errors;
 pub mod instructions;

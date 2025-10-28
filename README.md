@@ -1,46 +1,113 @@
-# Pinocchio Template
+# SOLCAT Diamond Hands Program
 
-A simple Solana program template built with the Pinocchio framework for high-performance program development.
+Hi! I'm [@CoachChuckSOL](https://github.com/coachchucksol) ( or [@CoachChuckFF](https://x.com/CoachChuckFF) ), I made this little diamond hands program to serve as a tutorial, starting point and or example code to further help people learn Solana development!
 
-## Features
+This idea all came from aping into [$SOLCAT](https://pump.fun/coin/84Y6h6XoaLAD1zxoQ2CDhcZYRpNsSBKsXULCnpjXpump), here is the [tweet](https://x.com/CoachChuckFF/status/1966574911071416414). I bought ~5% of the supply and have locked up my tokens for 6 months: HERE:
 
-- 🚀 **High Performance**: Built with Pinocchio - Low CU BABY!
-- 🧪 **Testing Ready**: Complete test suite using `solana-program-test` - the best balance between control and overhead
-- 📦 **Modular Design**: Clean separation between program, SDK, CLI, and tests
-- 🔧 **Developer Friendly**: No magic black box - all in simple Rust!
+CA: `84Y6h6XoaLAD1zxoQ2CDhcZYRpNsSBKsXULCnpjXpump`
+Note - It bothers me that people use the term CA for solana tokens. CA stands for `Contract Address` which comes from Ethereum. In Solana, all tokens come from the Token or Token2022 program. Its not a new "Contract". And the explorers call them: "Tokens" which is also confusing, because the `CA` is actually the `Mint`, and the `Token Account` is what holds the minted tokens. So, `CA` is the `Mint` and `Token` is the `Mint` and your `Token Account` is what holds the minted tokens. Anyways, thats my rant, thank you for coming to my ted talk!
 
-## Installation
+## IMPORTANT
+
+For legal reasons, I put out this program to serve as a tutorial, starting point and or example code to further help people learn Solana development! It should not be used for anything other than learning purposes. If you choose to use this program, you do so at your own risk and I cannot be held responsible for any losses incurred.
+
+Additionally, I am NOT the creator of [$SOLCAT](https://pump.fun/coin/84Y6h6XoaLAD1zxoQ2CDhcZYRpNsSBKsXULCnpjXpump), I did buy it ~5% of supply, I am locking it up using this program ( 6 months, ~until March 2026 ), and I am using it to promote Solana development. I am not endorsing the token or promoting it in any way. And nothing here is financial advice.
+
+### Accounts/Links
+
+PLEASE DOUBLE CHECK YOU USE THE CORRECT ACCOUNTS AND LINKS TO AVOID LOSING YOUR TOKENS IF YOU DECIDE TO USE THIS PROGRAM
+
+ProgramID: `CATvuZTNuyeBkoo5Tpeqtxcn51NDLNMExWPZ5vzQxkEg`
+SOLCAT Mint: `84Y6h6XoaLAD1zxoQ2CDhcZYRpNsSBKsXULCnpjXpump`
+My SOLCAT Wallet: `98DTkcLHy56bMFqCeWG2VsTkxf47ocQVbtkZfpHBw3v4`
+
+### Proof of Lockup
+
+Here is the proof of lockup my lockup: [link](https://explorer.solana.com/address/84Y6h6XoaLAD1zxoQ2CDhcZYRpNsSBKsXULCnpjXpump)
+
+You can view it using the included CLI:
 
 ```bash
-git clone <your-repo-url>
-cd pinocchio-template
-./test.sh
+# Build and install CLI
+./ci.sh
+solcat-diamond-hands-cli \
+    --rpc https://api.mainnet-beta.solana.com \
+    view \
+    --wallet 98DTkcLHy56bMFqCeWG2VsTkxf47ocQVbtkZfpHBw3v4
 ```
 
-## Design Decisions
+## How to lock up your tokens
 
-Inspired by ( https://github.com/Nagaprasadvr/solana-pinocchio-starter )
-Found from ( https://solana.stackexchange.com/questions/21489/are-there-any-examples-of-the-pinocchio-framework-that-i-can-study )
+*NOTE*: Although I trust my work, and I am okay with the risk of putting my tokens in a vault for 6 months, I am also aware that there is alaways risk of losing my tokens if the program is not working as expected or a bug is found! So for that reason, I cannot take responsibility for any loss of funds.
 
+With that out of the way. You have a couple of options to lock up your tokens:
 
-- **No Direct Dependencies**: No crate should use `solcat-diamond-hands-program` directly - the SDK forwards all important exports
-- **Zero-Copy Performance**: Uses Pinocchio for minimal runtime overhead
-- **Comprehensive Testing**: Uses Solana Program Test for integration tests with realistic program interactions. Local validator and other testing frameworks did not meet our needs.
-- **Workspace Structure**: Organized as a Cargo workspace for better dependency management
+1. **Manual Lockup**: Use the CLI to manually lock up your tokens.
+2. **UI Lockup**: Use the vibe-coded frontend to lock up your tokens.
 
-## Contributing
+### Manual Lockup
+I will leave #1 as an exercise for the reader ( see the tutorial below )
 
-Feel free to make PRs to make this template better!
+### UI Lockup
+I may host a locking site, however, for legal reasons right now, I am going to suggest you run it locally.
 
-1. Fork the repository
-2. Make your changes
-3. Run `./test.sh` to ensure tests pass
-4. Submit a pull request
+To run the UI locally, follow these steps:
+
+1. Clone the repository
+```bash
+git clone https://github.com/coachchucksol/solcat
+```
+
+2. Navigate to the frontend app
+```bash
+cd solcat/app
+```
+3. Setup the `.env` file
+```bash
+cp .env.example .env.local
+```
+
+4. Edit the `.env` file to use a mainnet RPC, and double check the SOLCAT mint it correct! ( Yes, you could lock up any token if you wanted to! )
+```bash
+# This RPC is safe to use, since it is only used client-side, this should be your faster RPC
+RPC_ENDPOINT=https://api.mainnet-beta.solana.com
+# NOTE! This is public, only use an RPC that you are okay exposing, like `https://api.mainnet-beta.solana.com`
+NEXT_PUBLIC_RPC_ENDPOINT=https://api.mainnet-beta.solana.com
+# SOLCAT Accounts - these are also public
+NEXT_PUBLIC_SOLCAT_DIAMOND_HANDS_ID=CATvuZTNuyeBkoo5Tpeqtxcn51NDLNMExWPZ5vzQxkEg
+NEXT_PUBLIC_SOLCAT_MINT=84Y6h6XoaLAD1zxoQ2CDhcZYRpNsSBKsXULCnpjXpump
+```
+
+5. Run the frontend
+```bash
+npm run dev
+```
+
+6. Open your browser and navigate to http://localhost:3000
 
 ## License
 
 MIT License - see [LICENSE.md](LICENSE.md) file for details
 
+# How to Use this Repo
+
+Instead of a guide in the readme here, I went through and annotated a lot of the code to help you understand what's going on. I would highly recommend you deploying the program locally, and see if you can add any new features!
+
+[CHALLENGE] - Take this program and add a feature to take a small vault fee to unlock the vault early!
+
+## Features
+
+- 🚀 **High Performance**: Built with Pinocchio - Low CU BABY!
+- 🧪 **Testing Ready**: Complete test suite using `solana-program-test` - the best balance between control and overhead.
+- 📦 **Modular Design**: Clean separation between program, SDK, CLI, and tests
+- 🔧 **Developer Friendly**: No magic black boxs - all in simple Rust! I also follow the principle of As Few Crates As Possible (AFCAP)
+
+## Installation
+
+```bash
+git clone https://github.com/coachchucksol/solcat
+./ci.sh
+```
 
 # SolCat Diamond Hands - Local Development Guide
 
@@ -50,9 +117,8 @@ This guide walks you through building, deploying, and testing the SolCat Diamond
 
 ## Prerequisites
 
-- Solana CLI tools installed
-- Rust and Cargo installed
-- Anchor framework installed (if using Anchor)
+- [Solana CLI tools installed](https://solana.com/docs/intro/installation)
+- A good attitude!
 
 ---
 
@@ -74,18 +140,15 @@ This will compile the program and generate the `.so` file in `target/deploy/`.
 
 ## Step 2: Start Local Validator
 
-Start a local Solana test validator:
+Start a local Solana test validator in a new terminal:
 
 ```bash
 solana-test-validator
 ```
 
-**Note:** Keep this terminal open. The validator will run in the foreground.
+or, if you're on the cutting edge, use [surfpool!](https://surfpool.run/)
 
-**Optional flags:**
-- `--reset` - Start with a clean ledger
-- `--quiet` - Reduce log output
-- `--bpf-program <PROGRAM_ID> <PROGRAM_PATH>` - Preload a program
+**Note:** Keep this terminal open. The validator will run in the foreground.
 
 ---
 
@@ -119,10 +182,24 @@ Create a new SPL token mint for testing:
 spl-token create-token
 ```
 
-**Save the mint address** - you'll need it for the CLI commands!
+You should get an output like this:
 ```bash
+Creating token 4Q4nUGn1MtGF5Y4NYAdQtFCUkTr4jwaN4uLrZzY4E1Fi under program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+
+Address:  4Q4nUGn1MtGF5Y4NYAdQtFCUkTr4jwaN4uLrZzY4E1Fi
+Decimals:  9
+
+Signature: 65D8BjKCZkNbobLumyhpyBJjVsZYEnbuvcEzAPbHmqUTb9dhbaGSw1M5yaHkC9aCJusTqDDdsSGpL4GS9e1dBUrM
+```
+
+**Save the mint address (`Address`)** - you'll need it for the CLI commands!
+
+```bash
+# MINT_ADDRESS=4Q4nUGn1MtGF5Y4NYAdQtFCUkTr4jwaN4uLrZzY4E1Fi
 MINT_ADDRESS=<MINT_ADDRESS>
 ```
+
+Now create a token account and mint some tokens!
 
 ```bash
 # Create a token account for your wallet
@@ -168,12 +245,16 @@ solcat-diamond-hands-cli \
     --mint $MINT_ADDRESS \
     --slots-to-lock 10
 
+# View the vault
 solcat-diamond-hands-cli \
     --rpc http://localhost:8899 \
     view \
     --wallet $(solana address)
 
-# Empty the vault
+# Check that all of your tokens have been moved and locked
+spl-token balance $MINT_ADDRESS
+
+# Wait for 10 slots ( almost instant ) and Empty the vault
 solcat-diamond-hands-cli \
     --rpc http://localhost:8899 \
     empty \
@@ -196,24 +277,12 @@ In the terminal running `solana-test-validator`, press:
 Ctrl + C
 ```
 
-### Clean Up Test Ledger (Optional)
+### Clean Up Test Ledger
 
 Remove the test ledger data:
 
 ```bash
 rm -rf test-ledger/
-```
-
-### Reset Solana Config (Optional)
-
-If you want to switch back to devnet/mainnet:
-
-```bash
-# Devnet
-solana config set -u devnet
-
-# Mainnet
-solana config set -u mainnet-beta
 ```
 
 ---
@@ -240,54 +309,3 @@ solana config set -u mainnet-beta
 - Check your PATH includes `~/.cargo/bin`
 
 ---
-
-## Quick Reference
-
-### Useful Commands
-
-```bash
-# Check SOL balance
-solana balance
-
-# Airdrop SOL (localhost only)
-solana airdrop 2
-
-# Check token balance
-spl-token balance <MINT_ADDRESS>
-
-# View all token accounts
-spl-token accounts
-
-# Check validator status
-solana cluster-version
-
-# View program account
-solana program show <PROGRAM_ID>
-```
-
----
-
-## Advanced: Fast-Forward Time
-
-To test lockup periods without waiting:
-
-```bash
-# Start validator with faster slots
-solana-test-validator --slots-per-epoch 100
-
-# Or warp to a specific slot
-solana-test-validator --warp-slot 1000000
-```
-
----
-
-## Next Steps
-
-- Test edge cases (empty vault, double lock, etc.)
-- Try locking different amounts and durations
-- Integrate with a UI or other tools
-- Deploy to devnet for broader testing
-
----
-
-**Happy Building! 💎🙌**

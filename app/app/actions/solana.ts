@@ -10,12 +10,33 @@ const getConnection = () => {
   return new Connection(endpoint, 'confirmed');
 };
 
+export async function getEpochInfo() {
+  try {
+    const connection = getConnection();
+    const epoch_info = await connection.getEpochInfo();
+
+    return {
+      success: true as const,
+      data: {
+        slot: epoch_info.absoluteSlot,
+        epoch: epoch_info.epoch,
+        slotIndex: epoch_info.slotIndex,
+      },
+    };
+  } catch (error) {
+    console.error('Error getting Epoch Info:', error);
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
 export async function getBalance(address: string) {
   try {
     const connection = getConnection();
     const pubkey = new PublicKey(address);
     const balance = await connection.getBalance(pubkey);
-    console.log(balance);
 
     return {
       success: true as const,
