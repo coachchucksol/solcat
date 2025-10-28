@@ -14,6 +14,21 @@ const WalletMultiButton = dynamic(
   { ssr: false }
 );
 
+// Add a client-side only wrapper
+const ClientOnly = ({ children }: { children: React.ReactNode }) => {
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  if (!hasMounted) {
+    return null;
+  }
+
+  return <>{children}</>;
+};
+
 interface VaultData extends VaultJSON {
   address: string;
 }
@@ -46,6 +61,7 @@ export default function Home() {
   const [loadingSolcatVaultBalance, setLoadingSolcatVaultBalance] = useState(false);
   const [creatingVault, setCreatingVault] = useState(false);
   const [emptyingVault, setEmptyingVault] = useState(false);
+  const [slotsToLock, setSlotsToLock] = useState<string>('10');
 
   // ============================================================================
   // Effects
@@ -67,6 +83,16 @@ export default function Home() {
     }
   }, [publicKey]);
 
+  // Auto-refresh epoch info when vault exists
+  useEffect(() => {
+    if (!publicKey || !vault) return;
+
+    const interval = setInterval(() => {
+      loadEpochInfo();
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [publicKey, vault]);
 
   const loadMint = async () => {
     setLoadingMint(true);
@@ -77,8 +103,7 @@ export default function Home() {
       console.error('Failed to load mint:', result.error);
       setMint(null);
     }
-
-    setLoadingMint(true);
+    setLoadingMint(false);
   };
 
   const loadEpochInfo = async () => {
@@ -92,7 +117,6 @@ export default function Home() {
       setBalance(null);
     }
   };
-
 
   const loadBalance = async () => {
     if (!publicKey) return;
@@ -160,25 +184,19 @@ export default function Home() {
       throw new Error('Wallet not connected');
     }
 
-    // Get recent blockhash
     const blockhashResult = await getRecentBlockhash();
     if (!blockhashResult.success) {
       throw new Error('Failed to get blockhash');
     }
 
-    // Create and populate transaction
     const transaction = new Transaction();
     transaction.recentBlockhash = blockhashResult.blockhash;
     transaction.feePayer = publicKey;
 
-    // Add instructions (handle both array and single instruction)
     const instructionsArray = Array.isArray(instructions) ? instructions : [instructions];
     instructionsArray.forEach(ix => transaction.add(ix));
 
-    // Sign transaction
     const signedTransaction = await signTransaction(transaction);
-
-    // Submit transaction
     const serializedTransaction = signedTransaction.serialize();
     const base64Transaction = Buffer.from(serializedTransaction).toString('base64');
 
@@ -201,14 +219,13 @@ export default function Home() {
     try {
       setCreatingVault(true);
 
-      const slotsToLock = BigInt(10);
+      const slotsToLockBigInt = BigInt(slotsToLock);
       const tokensToLock = solcatBalance ? BigInt(solcatBalance) : null;
 
-      const instructions = lockVaultIx(publicKey, SOLCAT_MINT, slotsToLock, tokensToLock);
+      const instructions = lockVaultIx(publicKey, SOLCAT_MINT, slotsToLockBigInt, tokensToLock);
 
       await executeTransaction(instructions, 'Vault created');
 
-      // Reload vault data
       await loadVault();
       await loadSolcatBalance();
       await loadSolcatVaultBalance();
@@ -234,7 +251,6 @@ export default function Home() {
 
       await executeTransaction(instruction, 'Vault emptied');
 
-      // Reload vault data
       await loadVault();
       await loadSolcatBalance();
     } catch (error) {
@@ -253,14 +269,6 @@ export default function Home() {
     const balanceBigInt = BigInt(balance);
     const divisor = BigInt(10 ** decimals);
     return (balanceBigInt / divisor).toString();
-  };
-
-  const formatAddress = (address: string) => {
-    return `${address.slice(0, 4)}...${address.slice(-4)}`;
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
   };
 
   const getSlotsLeft = (startSlot: number, slotsLocked: number, currentSlot: number) => {
@@ -290,284 +298,220 @@ export default function Home() {
     }
   }
 
-  // ============================================================================
-  // Renders
-  // ============================================================================
+  const estimatedDurationFromSlots = (slots: string) => {
+    try {
+      const slotsNum = parseInt(slots);
+      if (isNaN(slotsNum) || slotsNum <= 0) return 'Invalid';
 
-  const renderHero = () => {
-    return (
-      <div className="text-center space-y-6 animate-fade-in">
-        <div className="relative group">
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 rounded-3xl blur-2xl opacity-30 group-hover:opacity-50 transition-opacity duration-500"></div>
-          <Image
-            src="/cat.png"
-            alt="SOLCAT"
-            width={320}
-            height={320}
-            className="relative w-64 h-64 sm:w-80 sm:h-80 rounded-3xl shadow-2xl transform group-hover:scale-105 transition-transform duration-300"
-            style={{ imageRendering: 'pixelated' }}
-            priority
-          />
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-5xl sm:text-6xl font-black text-white tracking-tight">
-            SOLCAT
-          </h1>
-          <p className="text-xl text-white/80 font-medium">Diamond Hands Vault</p>
-        </div>
-      </div>
-    );
-  };
+      const timePerSlotMS = 500;
+      const timeLeftMS = slotsNum * timePerSlotMS;
+      const duration = {
+        milliseconds: timeLeftMS,
+        seconds: Math.floor(timeLeftMS / 1000),
+        minutes: Math.floor(timeLeftMS / (1000 * 60)),
+        hours: Math.floor(timeLeftMS / (1000 * 60 * 60)),
+      };
+      return formatDuration(duration);
+    } catch {
+      return 'Invalid';
+    }
+  }
 
-  const renderWalletSection = () => {
-    return (
-      <div className="w-full max-w-2xl">
-        <div className="flex justify-center">
-          <WalletMultiButton className="!bg-gradient-to-r !from-purple-600 !to-pink-600 hover:!from-purple-700 hover:!to-pink-700 !rounded-xl !px-8 !py-3 !font-bold !text-base !shadow-lg !transition-all hover:!shadow-xl hover:!scale-105" />
-        </div>
-      </div>
-    );
-  };
+  const getEstimatedUnlockDate = (slots: string): string => {
+    try {
+      const slotsNum = parseInt(slots);
+      if (isNaN(slotsNum) || slotsNum <= 0) return 'Invalid';
 
-  const renderBalances = () => {
-    if (!publicKey) return null;
+      const timePerSlotMS = 500;
+      const timeLeftMS = slotsNum * timePerSlotMS;
 
-    return (
-      <div className="w-full max-w-2xl px-4 sm:px-0 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-slide-up">
-        {/* SOL Balance Card */}
-        <div className="bg-gradient-to-br from-indigo-500/20 to-purple-500/20 backdrop-blur-xl rounded-2xl p-6 sm:p-7 border border-white/10 shadow-xl hover:shadow-2xl transition-all hover:scale-105">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-lg">◎</span>
-            </div>
-            <h3 className="text-white/60 text-sm font-semibold uppercase tracking-wider">SOL Balance</h3>
-          </div>
-          <p className="text-3xl font-black text-white">
-            {balance !== null ? `${(balance / 1e9).toFixed(4)}` : '---'}
-          </p>
-        </div>
+      const unlockDate = new Date(Date.now() + timeLeftMS);
 
-        {/* SOLCAT Balance Card */}
-        <div className="bg-gradient-to-br from-pink-500/20 to-orange-500/20 backdrop-blur-xl rounded-2xl p-6 sm:p-7 border border-white/10 shadow-xl hover:shadow-2xl transition-all hover:scale-105">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-orange-500 flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-lg">🐱</span>
-            </div>
-            <h3 className="text-white/60 text-sm font-semibold uppercase tracking-wider">SOLCAT Balance</h3>
-          </div>
-          <p className="text-3xl font-black text-white">
-            {loadingSolcatBalance ? (
-              <span className="animate-pulse">Loading...</span>
-            ) : solcatBalance !== null && mint?.decimals ? (
-              formatBalance(solcatBalance, mint.decimals)
-            ) : (
-              '---'
-            )}
-          </p>
-        </div>
-      </div>
-    );
-  };
+      const month = String(unlockDate.getMonth() + 1).padStart(2, '0');
+      const day = String(unlockDate.getDate()).padStart(2, '0');
+      const year = unlockDate.getFullYear();
+      const hours = String(unlockDate.getHours()).padStart(2, '0');
+      const minutes = String(unlockDate.getMinutes()).padStart(2, '0');
 
-  const renderVault = () => {
-    if (!publicKey) return null;
-
-    return (
-      <div className="w-full max-w-2xl px-4 sm:px-0 animate-slide-up">
-        <div className="bg-white/5 backdrop-blur-2xl rounded-3xl border border-white/10 shadow-2xl overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600/30 to-pink-600/30 px-6 sm:px-8 py-5 sm:py-6 border-b border-white/10">
-            <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-3">
-              <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
-                🔒
-              </span>
-              Diamond Hands Vault
-            </h2>
-          </div>
-
-          {/* Content */}
-          <div className="p-6 sm:p-8">
-            {loadingVault ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-4 border-white/20 border-t-white"></div>
-              </div>
-            ) : vault ? (
-              <div className="space-y-6">
-                {/* Vault Address */}
-                <div className="bg-white/5 rounded-xl p-4 sm:p-5 border border-white/10">
-                  <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Vault Address</p>
-                  <div className="flex items-center gap-2">
-                    <code className="text-white font-mono text-xs sm:text-sm flex-1 break-all">{vault.address}</code>
-                    <button
-                      onClick={() => copyToClipboard(vault.address)}
-                      className="text-white/60 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg flex-shrink-0"
-                      title="Copy address"
-                    >
-                      📋
-                    </button>
-                  </div>
-                </div>
-
-                {/* Stats Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-xl p-4 sm:p-5 border border-green-500/20">
-                    <p className="text-green-400 text-xs font-semibold uppercase tracking-wider mb-2">Tokens Locked</p>
-                    <p className="text-2xl font-bold text-white">
-                      {(BigInt(solcatVaultBalance ?? 0) / BigInt(10 ** vault.mintDecimals)).toString()}
-                    </p>
-                    <p className="text-green-400/60 text-xs mt-1">SOLCAT</p>
-                  </div>
-
-                  <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-xl p-4 sm:p-5 border border-blue-500/20">
-                    <p className="text-blue-400 text-xs font-semibold uppercase tracking-wider mb-2">Lock Duration</p>
-                    <p className="text-2xl font-bold text-white">
-                      {(BigInt(vault.slotsLocked)).toString()} Slots
-                    </p>
-                    <p className="text-blue-400/60 text-xs mt-1">epochs ({vault.slotsLocked} slots)</p>
-                  </div>
-                </div>
-
-                {/* Additional Info */}
-                <div className="space-y-3">
-                  <div className="bg-white/5 rounded-xl p-4 sm:p-5 border border-white/10">
-                    <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Estimated Lock Up</p>
-                      <p className="text-white font-mono text-sm">
-                        {formatDuration(estimatedTimeLeft(
-                          Number(vault.startSlot),
-                          Number(vault.slotsLocked),
-                          epochInfo?.slot ?? 0
-                        ))}
-                      </p>
-                  </div>
-
-                  <div className="bg-white/5 rounded-xl p-4 sm:p-5 border border-white/10">
-                    <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Current Slot</p>
-                      <p className="text-white font-mono text-sm">{ epochInfo?.slot ?? 'N/A' }</p>
-                  </div>
-
-                  <div className="bg-white/5 rounded-xl p-4 sm:p-5 border border-white/10">
-                    <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Start/End Slot</p>
-                      <p className="text-white font-mono text-sm">{vault.startSlot}-{vault.startSlot + vault.slotsLocked}</p>
-                  </div>
-
-                  <div className="bg-white/5 rounded-xl p-4 sm:p-5 border border-white/10">
-                    <p className="text-white/60 text-xs font-semibold uppercase tracking-wider mb-2">Vault Token Account</p>
-                    <div className="flex items-center gap-2">
-                      <code className="text-white font-mono text-xs flex-1 break-all">{vault.vaultToken}</code>
-                      <button
-                        onClick={() => copyToClipboard(vault.vaultToken)}
-                        className="text-white/60 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg flex-shrink-0"
-                        title="Copy address"
-                      >
-                        📋
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Empty Vault Button */}
-                <button
-                  onClick={handleEmptyVault}
-                  disabled={emptyingVault}
-                  className="w-full bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white px-6 py-4 rounded-xl font-bold text-base sm:text-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 disabled:hover:scale-100"
-                >
-                  {emptyingVault ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="animate-spin">⏳</span>
-                      Emptying Vault...
-                    </span>
-                  ) : (
-                    '🔓 Empty Vault'
-                  )}
-                </button>
-              </div>
-            ) : (
-              <div className="text-center py-12 space-y-6">
-                <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center border border-white/10">
-                  <span className="text-4xl">🔒</span>
-                </div>
-                <div className="space-y-2 px-4">
-                  <h3 className="text-xl font-bold text-white">No Vault Found</h3>
-                  <p className="text-white/60 text-sm sm:text-base">Create a vault to lock your SOLCAT tokens and become a diamond hands holder</p>
-                </div>
-                <button
-                  onClick={handleCreateVault}
-                  disabled={creatingVault || !solcatBalance || BigInt(solcatBalance) === BigInt(0)}
-                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white px-8 py-4 rounded-xl font-bold text-base sm:text-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 disabled:hover:scale-100"
-                >
-                  {creatingVault ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="animate-spin">⏳</span>
-                      Creating Vault...
-                    </span>
-                  ) : (
-                    '✨ Create Diamond Hands Vault'
-                  )}
-                </button>
-                {solcatBalance && BigInt(solcatBalance) === BigInt(0) && (
-                  <p className="text-white/40 text-sm px-4">You need SOLCAT tokens to create a vault</p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
+      return `${month}.${day}.${year} ${hours}:${minutes}`;
+    } catch {
+      return 'Invalid';
+    }
+  }
 
   // ============================================================================
-  // Main
+  // Main Render
   // ============================================================================
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#38beff] via-[#4a9eff] to-[#5c7eff] relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-orange-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+    <div className="min-h-screen bg-gradient-to-br from-[#38beff] via-[#4a9eff] to-[#5c7eff] flex items-center justify-center p-8">
+      <div className="max-w-4xl w-full space-y-8">
+
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Image
+              src="/cat.png"
+              alt="SOLCAT"
+              width={60}
+              height={60}
+              className="rounded-lg"
+              style={{ imageRendering: 'pixelated' }}
+              priority
+            />
+            <div>
+              <h1 className="text-3xl font-bold text-white">SOLCAT</h1>
+              <p className="text-white/70">Diamond Hands Vault</p>
+            </div>
+          </div>
+          <ClientOnly>
+            <WalletMultiButton className="!bg-purple-600 hover:!bg-purple-700 !rounded-lg" />
+          </ClientOnly>
+        </div>
+
+        {publicKey ? (
+          <>
+            {/* Balances */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-8 border border-white/20">
+                <div className="text-white/70 text-sm mb-2">SOL Balance</div>
+                <div className="text-2xl font-bold text-white">
+                  {balance !== null ? (balance / 1e9).toFixed(4) : '---'}
+                </div>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-8 border border-white/20">
+                <div className="text-white/70 text-sm mb-2">SOLCAT Balance</div>
+                <div className="text-2xl font-bold text-white">
+                  {loadingSolcatBalance ? (
+                    'Loading...'
+                  ) : solcatBalance !== null && mint?.decimals ? (
+                    formatBalance(solcatBalance, mint.decimals)
+                  ) : (
+                    '---'
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Vault */}
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg border border-white/20">
+              <div className="p-8 border-b border-white/20">
+                <h2 className="text-xl font-bold text-white">Vault</h2>
+              </div>
+
+              <div className="p-8">
+                {loadingVault ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-10 w-10 border-2 border-white/30 border-t-white mx-auto"></div>
+                  </div>
+                ) : vault ? (
+                  <div className="space-y-4">
+                    {/* Vault Stats */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-white/70 text-sm mb-2">Tokens Locked</div>
+                        <div className="text-xl font-bold text-white">
+                          {(BigInt(solcatVaultBalance ?? 0) / BigInt(10 ** vault.mintDecimals)).toString()} SOLCAT
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-white/70 text-sm mb-2">Time Remaining</div>
+                        <div className="text-xl font-bold text-white">
+                          {formatDuration(estimatedTimeLeft(
+                            Number(vault.startSlot),
+                            Number(vault.slotsLocked),
+                            epochInfo?.slot ?? 0
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Vault Details */}
+                    <div className="space-y-4 pt-4">
+                      <div>
+                        <div className="text-white/70 text-xs mb-2">Vault Address</div>
+                        <div className="flex items-center gap-2">
+                          <code className="text-white text-sm font-mono flex-1 truncate">{vault.address}</code>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <div className="text-white/70 text-xs mb-2">Slots Locked</div>
+                          <div className="text-white text-sm">{vault.slotsLocked}</div>
+                        </div>
+                        <div>
+                          <div className="text-white/70 text-xs mb-2">Current Slot</div>
+                          <div className="text-white text-sm">{epochInfo?.slot ?? 'N/A'}</div>
+                        </div>
+                        <div>
+                          <div className="text-white/70 text-xs mb-2">End Slot</div>
+                          <div className="text-white text-sm">{Number(vault.startSlot) + Number(vault.slotsLocked)}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Empty Vault Button */}
+                    <button
+                      onClick={handleEmptyVault}
+                      disabled={emptyingVault || !epochInfo || epochInfo.slot <= Number(vault.startSlot) + Number(vault.slotsLocked)}
+                      className="w-full mt-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                    >
+                      {emptyingVault ? 'Emptying Vault...' :
+                       (!epochInfo || epochInfo.slot <= Number(vault.startSlot) + Number(vault.slotsLocked)) ?
+                       'Vault Locked' : 'Empty Vault'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="text-center py-6">
+                      <div className="text-white/70 mb-2">No vault found</div>
+                      <div className="text-white text-sm">Create a vault to lock your SOLCAT tokens</div>
+                    </div>
+
+                    {/* Create Vault Form */}
+                    <div>
+                      <label className="text-white/70 text-sm mb-2 block">Slots to Lock</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={slotsToLock}
+                        onChange={(e) => setSlotsToLock(e.target.value)}
+                        className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        placeholder="Enter number of slots"
+                      />
+                      <div className="text-white text-sm mt-2 bg-white/10 rounded px-3 py-2 border border-white/20">
+                        ≈ {estimatedDurationFromSlots(slotsToLock)} (Est Unlock: {getEstimatedUnlockDate(slotsToLock)})
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleCreateVault}
+                      disabled={creatingVault || !solcatBalance || BigInt(solcatBalance) === BigInt(0) || !slotsToLock || parseInt(slotsToLock) <= 0}
+                      className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                    >
+                      {creatingVault ? 'Creating Vault...' : 'Create Vault'}
+                    </button>
+
+                    {solcatBalance && BigInt(solcatBalance) === BigInt(0) && (
+                      <div className="text-white/50 text-sm text-center">
+                        You need SOLCAT tokens to create a vault
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-12 border border-white/20 text-center">
+            <div className="text-white/70 mb-4">Connect your wallet to get started</div>
+            <ClientOnly>
+              <WalletMultiButton className="!bg-purple-600 hover:!bg-purple-700 !rounded-lg mx-auto" />
+            </ClientOnly>
+          </div>
+        )}
       </div>
-
-      {/* Content */}
-      <div className="relative flex flex-col items-center justify-center min-h-screen gap-8 sm:gap-10 px-6 sm:px-8 md:px-12 lg:px-16 py-16 sm:py-20">
-        {renderHero()}
-        {renderWalletSection()}
-        {renderBalances()}
-        {renderVault()}
-      </div>
-
-      {/* Custom Animations */}
-      <style jsx>{`
-        @keyframes fade-in {
-          from {
-            opacity: 0;
-            transform: translateY(-20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes slide-up {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .animate-fade-in {
-          animation: fade-in 0.6s ease-out;
-        }
-
-        .animate-slide-up {
-          animation: slide-up 0.6s ease-out;
-        }
-      `}</style>
     </div>
   );
 }

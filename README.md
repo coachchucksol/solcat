@@ -49,7 +49,9 @@ With that out of the way. You have a couple of options to lock up your tokens:
 I will leave #1 as an exercise for the reader ( see the tutorial below )
 
 ### UI Lockup
-I may host a locking site, however, for legal reasons right now, I am going to suggest you run it locally.
+I may host a locking site at some point, however, for legal reasons right now, I am going to suggest you run it locally.
+
+ALSO NOTE - I am proud of the rust code in this repo. However, the frontend is vibe coded, it works but it is NOT a good production-ready solution. Its janky, but it works. Maybe someday, I program it correctly. That being said, the one design pattern I wanted to point out is that only the `server` can call RPC methods as to not leak the RPC endpoint to the client. This is important!
 
 To run the UI locally, follow these steps:
 
@@ -84,6 +86,10 @@ npm run dev
 ```
 
 6. Open your browser and navigate to http://localhost:3000
+7. Set how many slots you want to lock up for your vault ( 1 slot ~= 500ms)
+I would reccomend setting it to 1 slot and try a full cycle of lock/unlock before you commit to something bigger.
+8. Click the `Create Vault` button to lock up your vault
+9. Wait until the slots have passed and click `Empty Vault`
 
 ## License
 
@@ -101,6 +107,7 @@ Instead of a guide in the readme here, I went through and annotated a lot of the
 - 🧪 **Testing Ready**: Complete test suite using `solana-program-test` - the best balance between control and overhead.
 - 📦 **Modular Design**: Clean separation between program, SDK, CLI, and tests
 - 🔧 **Developer Friendly**: No magic black boxs - all in simple Rust! I also follow the principle of As Few Crates As Possible (AFCAP)
+- 🤖 **Vibe Coded UI**: The NextJS UI was vibecoded, its kinda janky and ugly. I may come back and make it better at some point.
 
 ## Installation
 
