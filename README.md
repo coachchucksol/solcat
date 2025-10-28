@@ -2,7 +2,7 @@
 
 Hi! I'm [@CoachChuckSOL](https://github.com/coachchucksol) ( or [@CoachChuckFF](https://x.com/CoachChuckFF) ), I made this little diamond hands program to serve as a tutorial, starting point and or example code to further help people learn Solana development!
 
-This idea all came from aping into [$SOLCAT](https://pump.fun/coin/84Y6h6XoaLAD1zxoQ2CDhcZYRpNsSBKsXULCnpjXpump), here is the [tweet](https://x.com/CoachChuckFF/status/1966574911071416414). I bought ~5% of the supply and have locked up my tokens for 6 months: HERE:
+This idea all came from aping into [$SOLCAT](https://pump.fun/coin/84Y6h6XoaLAD1zxoQ2CDhcZYRpNsSBKsXULCnpjXpump), here is the [tweet](https://x.com/CoachChuckFF/status/1966574911071416414). I bought ~5% of the supply and have locked up my tokens for 6 months: [TX](https://solscan.io/tx/3YuoFwJDnDpxYBB9bPjSmVxjNGswyLdEo7kVXRrUyHD4YTYVFKvKzoMDPBkjtv3bg9fgyqPeDixeLJ6kszyumEyW)
 
 CA: `84Y6h6XoaLAD1zxoQ2CDhcZYRpNsSBKsXULCnpjXpump`
 Note - It bothers me that people use the term CA for solana tokens. CA stands for `Contract Address` which comes from Ethereum. In Solana, all tokens come from the Token or Token2022 program. Its not a new "Contract". And the explorers call them: "Tokens" which is also confusing, because the `CA` is actually the `Mint`, and the `Token Account` is what holds the minted tokens. So, `CA` is the `Mint` and `Token` is the `Mint` and your `Token Account` is what holds the minted tokens. Anyways, thats my rant, thank you for coming to my ted talk!
@@ -21,12 +21,37 @@ ProgramID: `CATvuZTNuyeBkoo5Tpeqtxcn51NDLNMExWPZ5vzQxkEg`
 SOLCAT Mint: `84Y6h6XoaLAD1zxoQ2CDhcZYRpNsSBKsXULCnpjXpump`
 My SOLCAT Wallet: `98DTkcLHy56bMFqCeWG2VsTkxf47ocQVbtkZfpHBw3v4`
 
+NOTE: This program has been deployed to Solana mainnet, and I have revoked the update authority, making it immutable! Meaning, no one, including me, can update the program. This is for trust and transparency - I cannot change the program to rug anyone, nor if my keypair is compromised it can be used to rug anyone.
+
+To confirm this run:
+```bash
+solana program show CATvuZTNuyeBkoo5Tpeqtxcn51NDLNMExWPZ5vzQxkEg
+```
+
+It will show:
+```bash
+Program Id: CATvuZTNuyeBkoo5Tpeqtxcn51NDLNMExWPZ5vzQxkEg
+Owner: BPFLoaderUpgradeab1e11111111111111111111111
+ProgramData Address: 8LQSTEC3DrtxPfHDBne8knSwvBYe6Go8rioKdVSUkPUD
+Authority: none
+Last Deployed In Slot: 376354769
+Data Length: 40584 (0x9e88) bytes
+Balance: 0.28366872 SOL
+```
+Note `Authority: none`
+
 ### Proof of Lockup
 
-Here is the proof of lockup my lockup: [link](https://explorer.solana.com/address/84Y6h6XoaLAD1zxoQ2CDhcZYRpNsSBKsXULCnpjXpump)
+And I am locking up for 6 months starting 10.28.25. I am assuming 500ms per slot, so I will lock up for: 365/2 * 24 * 60 * 60 * 2 = 31_536_000 slots ( ~73 epochs )
+
+Before I locked for full amount, I ran a 1 slot test lockup:
+Test [Lock](https://solscan.io/tx/4qf2HXT8iRhJbPKyRLqPug8LkBwRqRzLfUNBc5UZmFPCUhwrW2uSNmf64KKzAcTCtu1oAMLVXkyBAVfse2bfNZpy)/[Unlock](https://solscan.io/tx/3qTptPYoCfUHZ3nMcfVrHMgpuEnwaC44QmiZhnNBbDAFvi5g1pd49UDHXtyj7g3qLV8bTej1Hi3EXt6fbVTXA2nj)
+
+To view the full lockup, we can look at the lockup TX and use the CLI:
+
+Here is the proof of lockup my lockup: [TX](https://solscan.io/tx/3YuoFwJDnDpxYBB9bPjSmVxjNGswyLdEo7kVXRrUyHD4YTYVFKvKzoMDPBkjtv3bg9fgyqPeDixeLJ6kszyumEyW)
 
 You can view it using the included CLI:
-
 ```bash
 # Build and install CLI
 ./ci.sh
@@ -34,6 +59,24 @@ solcat-diamond-hands-cli \
     --rpc https://api.mainnet-beta.solana.com \
     view \
     --wallet 98DTkcLHy56bMFqCeWG2VsTkxf47ocQVbtkZfpHBw3v4
+```
+
+It will show:
+```bash
+=== Viewing vaults for wallet: 98DTkcLHy56bMFqCeWG2VsTkxf47ocQVbtkZfpHBw3v4 ===
+RPC address: https://api.mainnet-beta.solana.com
+
+9ux8qaN2eYwZFXxyXAXjm2ksHHRuh5V1WpAFYnBzss1y
+Tokens Locked 49700164287929
+
+Vault Account:
+├─ Discriminator: 1
+├─ Bump: 255
+├─ Admin: [120, 182, 166, 170, 186, 84, 54, 50, 169, 128, 95, 105, 202, 3, 220, 57, 110, 188, 252, 81, 35, 120, 14, 66, 216, 82, 65, 34, 118, 235, 214, 29]
+├─ Mint: [104, 233, 182, 179, 98, 120, 36, 139, 245, 165, 130, 13, 229, 7, 111, 79, 154, 88, 4, 50, 190, 237, 119, 203, 194, 177, 193, 227, 29, 79, 10, 47]
+├─ Vault Token Account: [164, 66, 92, 30, 152, 201, 185, 168, 94, 212, 40, 120, 89, 195, 64, 22, 138, 213, 215, 246, 234, 179, 33, 201, 102, 94, 171, 245, 19, 189, 132, 196]
+├─ Start Slot: 376357433
+└─ Slots Locked: 31536000 (73.000 epochs)
 ```
 
 ## How to lock up your tokens
@@ -97,7 +140,7 @@ MIT License - see [LICENSE.md](LICENSE.md) file for details
 
 # How to Use this Repo
 
-Instead of a guide in the readme here, I went through and annotated a lot of the code to help you understand what's going on. I would highly recommend you deploying the program locally, and see if you can add any new features!
+Instead of a guide in the README here, I went through and annotated a lot of the code to help you understand what's going on. I would highly recommend you deploying the program locally, and see if you can add any new features!
 
 [CHALLENGE] - Take this program and add a feature to take a small vault fee to unlock the vault early!
 

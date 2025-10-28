@@ -183,6 +183,8 @@ pub fn process_empty_vault(
     // ----------------------- Close Vault -----------------------
     unsafe {
         // Transfer all lamports from vault to admin
+        // Note: when transferring lamports from a PDA, this is the best way to do it
+        // NOT by calling system.transfer
         *admin.borrow_mut_lamports_unchecked() = admin.lamports().saturating_add(vault.lamports());
         *vault.borrow_mut_lamports_unchecked() = 0;
 

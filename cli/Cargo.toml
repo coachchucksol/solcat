@@ -14,6 +14,9 @@ dotenv = { workspace = true }
 solana-account-decoder = { workspace = true }
 solana-client = { workspace = true }
 solana-keypair = { workspace = true }
+solana-program = { workspace = true }
 solana-signer = { workspace = true }
 solana-transaction = { workspace = true }
 solcat-diamond-hands-sdk = { workspace = true }
+spl-associated-token-account-interface = { workspace = true }
+spl-token-interface = { workspace = true }

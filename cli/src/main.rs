@@ -7,9 +7,11 @@ use solana_client::{
     rpc_filter::{Memcmp, RpcFilterType},
 };
 use solana_keypair::{read_keypair_file, Keypair, Pubkey};
+use solana_program::program_pack::Pack;
 use solana_signer::Signer;
 use solana_transaction::Transaction;
 use solcat_diamond_hands_sdk::{deserialize_vault, empty_vault_ix, id, lock_vault_ix};
+use spl_associated_token_account_interface::address::get_associated_token_address;
 use std::{path::PathBuf, str::FromStr};
 
 #[derive(Parser, Debug)]
@@ -161,7 +163,15 @@ pub fn view_vaults(rpc_client: &RpcClient, wallet: &Pubkey) -> Result<()> {
         let vault_account = deserialize_vault(&account.data)
             .map_err(|e| anyhow!("Could not deserialize account {}", e))?;
 
+        let mint = Pubkey::new_from_array(*vault_account.mint());
+        let vault_ata = get_associated_token_address(&pubkey, &mint);
+        let vault_ata_account_raw = rpc_client.get_account(&vault_ata)?;
+
+        let vault_ata_account =
+            spl_token_interface::state::Account::unpack(&vault_ata_account_raw.data)?;
+
         println!("\n{}", pubkey);
+        println!("Tokens Locked {}\n", vault_ata_account.amount);
         println!("{}\n", vault_account);
     }
 

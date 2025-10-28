@@ -6954,9 +6954,12 @@ dependencies = [
  "solana-account-decoder",
  "solana-client",
  "solana-keypair",
+ "solana-program",
  "solana-signer",
  "solana-transaction",
  "solcat-diamond-hands-sdk",
+ "spl-associated-token-account-interface",
+ "spl-token-interface",
 ]
 
 [[package]]
