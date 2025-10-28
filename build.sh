@@ -3,5 +3,5 @@
 cargo build
 
 cd program
-cargo build-sbf
+cargo-build-bpf
 cd ..
